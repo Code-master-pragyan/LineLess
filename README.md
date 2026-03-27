@@ -1,6 +1,5 @@
 # LineLess India (Queue Elimination System)
 
-Hackathon-ready MERN prototype with **real-time queue updates** via **Socket.io**.
 
 ## What you get
 
