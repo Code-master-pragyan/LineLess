@@ -1,16 +1,93 @@
 import React, { useState } from "react";
 
-export default function PaymentModal({ open, onClose, onSuccess, amount = 1 }) {
+/**
+ * PaymentModal — Razorpay Integration
+ *
+ * Props:
+ *   open        {boolean}  — controls visibility
+ *   onClose     {fn}       — called when user dismisses modal
+ *   onSuccess   {fn}       — called with Razorpay payment response after success
+ *   amount      {number}   — amount in PAISE (e.g. 100 = ₹1, 5000 = ₹50)
+ *   orderId     {string}   — Razorpay order_id from your backend (required)
+ *   razorpayKey {string}   — your Razorpay Key ID (from env)
+ *   prefill     {object}   — optional: { name, email, contact }
+ */
+export default function PaymentModal({
+  open,
+  onClose,
+  onSuccess,
+  amount = 100,
+  orderId,
+  razorpayKey,
+  prefill = {},
+}) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   if (!open) return null;
 
-  async function handlePay() {
+  function handlePay() {
+    setError(null);
+
+    if (!window.Razorpay) {
+      setError("Razorpay SDK failed to load. Please refresh and try again.");
+      return;
+    }
+
+    if (!orderId) {
+      setError("Order not created yet. Please try again.");
+      return;
+    }
+
     setLoading(true);
-    // Mock payment delay
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    onSuccess?.({ mockPayment: true, amount });
+
+    const options = {
+      key: razorpayKey || import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount,                        // in paise, must match your backend order
+      currency: "INR",
+      name: "Queue Token",
+      description: "Digital Queue Token",
+      order_id: orderId,             // from your backend: razorpay.orders.create()
+      prefill: {
+        name: prefill.name || "",
+        email: prefill.email || "",
+        contact: prefill.contact || "",
+      },
+      method: {
+    upi: true,        // ✅ ADD THIS
+    card: true,
+    netbanking: true,
+    wallet: true,
+  },
+
+      theme: { color: "#2563eb" },
+      modal: {
+        ondismiss: () => {
+          setLoading(false);
+          // Don't close the whole modal — let user retry
+        },
+      },
+      handler: function (response) {
+        // response = { razorpay_payment_id, razorpay_order_id, razorpay_signature }
+        setLoading(false);
+        onSuccess?.(response);
+      },
+    };
+
+    const rzp = new window.Razorpay(options);
+
+    rzp.on("payment.failed", function (response) {
+      setLoading(false);
+      setError(
+        response?.error?.description ||
+          "Payment failed. Please try again."
+      );
+    });
+
+    rzp.open();
   }
+
+  const displayAmount = (amount / 100).toFixed(0); // paise → rupees
 
   return (
     <div
@@ -20,7 +97,7 @@ export default function PaymentModal({ open, onClose, onSuccess, amount = 1 }) {
       aria-label="Payment Modal"
     >
       <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl ring-1 ring-gray-200/70 overflow-hidden animate-scale-in">
-        {/* Header */}
+        {/* Accent bar */}
         <div className="relative h-1 bg-gradient-to-r from-medical-600 to-blue-600" />
 
         <div className="p-6 sm:p-8">
@@ -31,9 +108,11 @@ export default function PaymentModal({ open, onClose, onSuccess, amount = 1 }) {
                 🎫 Digital Token
               </div>
               <div className="mt-3 text-3xl font-bold text-gray-900">
-                Pay <span className="text-medical-600">₹{amount}</span>
+                Pay <span className="text-medical-600">₹{displayAmount}</span>
               </div>
-              <div className="mt-1 text-sm text-gray-600">Get instant digital queue token</div>
+              <div className="mt-1 text-sm text-gray-600">
+                Get instant digital queue token
+              </div>
             </div>
 
             <button
@@ -51,9 +130,13 @@ export default function PaymentModal({ open, onClose, onSuccess, amount = 1 }) {
             <div className="flex gap-3">
               <div className="text-2xl flex-shrink-0">⚡</div>
               <div>
-                <div className="font-semibold text-gray-900 mb-1">Instant Token Generation</div>
+                <div className="font-semibold text-gray-900 mb-1">
+                  Instant Token Generation
+                </div>
                 <div className="text-sm text-gray-700 leading-relaxed">
-                  Complete this mock payment to generate your digital queue token. Join the queue immediately and track your position in real-time.
+                  Complete payment via Razorpay to get your digital queue token.
+                  Join the queue immediately and track your position in
+                  real-time.
                 </div>
               </div>
             </div>
@@ -67,7 +150,9 @@ export default function PaymentModal({ open, onClose, onSuccess, amount = 1 }) {
             </div>
             <div className="text-center p-2">
               <div className="text-2xl mb-1">📍</div>
-              <div className="text-xs font-semibold text-gray-700">Live Track</div>
+              <div className="text-xs font-semibold text-gray-700">
+                Live Track
+              </div>
             </div>
             <div className="text-center p-2">
               <div className="text-2xl mb-1">🔔</div>
@@ -75,21 +160,28 @@ export default function PaymentModal({ open, onClose, onSuccess, amount = 1 }) {
             </div>
           </div>
 
-          {/* Payment Button */}
+          {/* Error */}
+          {error && (
+            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* Pay Button */}
           <button
             className="w-full bg-gradient-to-r from-medical-600 to-blue-600 text-white rounded-xl px-4 py-4 font-semibold text-base transition-all duration-300 hover:shadow-card-hover active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-3 animate-fade-in-4"
             onClick={handlePay}
-            disabled={loading}
+            disabled={loading || !orderId}
           >
             {loading ? (
               <>
                 <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Processing...
+                Opening Razorpay...
               </>
             ) : (
               <>
                 <span>💳</span>
-                Pay ₹{amount}
+                Pay ₹{displayAmount} via Razorpay
               </>
             )}
           </button>
@@ -98,7 +190,10 @@ export default function PaymentModal({ open, onClose, onSuccess, amount = 1 }) {
           <div className="border-t border-gray-200 pt-4 mt-4">
             <div className="flex items-center gap-2 text-xs text-gray-600">
               <span>🔒</span>
-              <span>This is a <strong>demo payment</strong>. Token generated immediately after submission.</span>
+              <span>
+                Secured by <strong>Razorpay</strong>. UPI, cards, netbanking
+                accepted.
+              </span>
             </div>
           </div>
         </div>
@@ -106,41 +201,3 @@ export default function PaymentModal({ open, onClose, onSuccess, amount = 1 }) {
     </div>
   );
 }
-
-//         <div className="mt-4 flex items-center justify-between gap-3">
-//           <div className="text-xs text-gray-500">
-//             Amount is fixed at ₹{amount}. No real payment.
-//           </div>
-//           {loading ? (
-//             <div className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-700">
-//               <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-indigo-700" />
-//               Processing…
-//             </div>
-//           ) : null}
-//         </div>
-
-//         <div className="mt-5 flex gap-2">
-//           <button
-//             className="flex-1 rounded-2xl border px-3 py-2.5 text-sm font-semibold hover:bg-gray-50 disabled:opacity-60"
-//             onClick={onClose}
-//             disabled={loading}
-//           >
-//             Cancel
-//           </button>
-//           <button
-//             className="flex-1 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-3 py-2.5 text-sm font-semibold hover:from-indigo-500 hover:to-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-//             onClick={handlePay}
-//             disabled={loading}
-//           >
-//             {loading ? "Generating Token..." : "Confirm Payment"}
-//           </button>
-//         </div>
-
-//         <div className="mt-3 text-[11px] text-gray-500">
-//           Tip: After you get the token, open the same queue using the QR code.
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-

@@ -78,13 +78,8 @@ async function listQueuesByHospital(hospitalId) {
   return Queue.find({ hospitalId }).sort({ createdAt: -1 }).lean();
 }
 
-async function generateToken(queueId, { mockPayment }) {
-  if (!mockPayment) {
-    const err = new Error("Payment required (mockPayment missing)");
-    err.statusCode = 400;
-    throw err;
-  }
-
+// ─── Updated: accepts Razorpay fields instead of mockPayment ─────────────────
+async function generateToken(queueId, { razorpayPaymentId, razorpayOrderId } = {}) {
   const queue = await Queue.findById(queueId);
   if (!queue) {
     const err = new Error("Queue not found");
@@ -99,6 +94,9 @@ async function generateToken(queueId, { mockPayment }) {
     queueId,
     tokenNumber,
     status: "waiting",
+    // Store payment info if your Token model supports it (optional)
+    ...(razorpayPaymentId && { razorpayPaymentId }),
+    ...(razorpayOrderId && { razorpayOrderId }),
   });
 
   const liveState = await getQueueLiveState(queueId);
@@ -141,4 +139,3 @@ module.exports = {
   generateToken,
   advanceToken,
 };
-
