@@ -3,11 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import { api } from "../../api/client";
 import Header from "../../components/Header";
-import StatusCard from "../../components/StatusCard";
 import { clearAdminToken, loadAdminToken } from "../../lib/storage";
 
 function getAuthHeaders(token) {
   return { Authorization: `Bearer ${token}` };
+}
+
+// Helper to format 24h time to 12h AM/PM format
+function formatTime(timeStr) {
+  if (!timeStr) return null;
+  const [hourString, minute] = timeStr.split(":");
+  const hour = +hourString % 24;
+  return (hour % 12 || 12) + ":" + minute + (hour < 12 ? " AM" : " PM");
 }
 
 export default function AdminDashboardPage() {
@@ -30,6 +37,8 @@ export default function AdminDashboardPage() {
   const [selectedHospitalId, setSelectedHospitalId] = useState("");
   const [qName, setQName] = useState("");
   const [qAvg, setQAvg] = useState(5);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
 
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -76,7 +85,6 @@ export default function AdminDashboardPage() {
       });
       setQueuesByHospital(nextMap);
 
-      // Keep the socket room subscriptions in sync after refetch.
       setQueueLiveById({});
     } catch (e) {
       setError(e?.response?.data?.error || e.message || "Failed to load administrative data");
@@ -102,12 +110,10 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (!adminToken) return;
-    // Connect socket once and join queue rooms as data arrives.
     const socket = io(apiUrl, { transports: ["websocket"] });
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      // Join immediately for already loaded queues
       allQueueIds.forEach((queueId) => socket.emit("joinQueue", { queueId }));
     });
 
@@ -125,7 +131,6 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const socket = socketRef.current;
     if (!socket) return;
-    // Join rooms for any queues not joined yet
     allQueueIds.forEach((queueId) => socket.emit("joinQueue", { queueId }));
   }, [allQueueIds]);
 
@@ -154,11 +159,19 @@ export default function AdminDashboardPage() {
     try {
       await api.post(
         "/queues",
-        { hospitalId: selectedHospitalId, name: qName.trim(), avgTimePerUser: qAvg },
+        { 
+          hospitalId: selectedHospitalId, 
+          name: qName.trim(), 
+          avgTimePerUser: qAvg,
+          startTime: startTime || null,
+          endTime: endTime || null
+        },
         { headers: getAuthHeaders(adminToken) }
       );
       setQName("");
       setQAvg(5);
+      setStartTime("");
+      setEndTime("");
       await refreshAll();
     } catch (e2) {
       setError(e2?.response?.data?.error || e2.message || "Failed to initialize new queue");
@@ -189,13 +202,26 @@ export default function AdminDashboardPage() {
     }
   }
 
+  // NEW: Handle Cancel/Delete Queue
+  async function handleCancelQueue(queueId) {
+    if (!window.confirm("Are you sure you want to cancel this queue? This will remove the queue entirely.")) return;
+    
+    setError(null);
+    try {
+      await api.delete("/queues/" + queueId, { headers: getAuthHeaders(adminToken) });
+      await refreshAll();
+    } catch (e) {
+      setError(e?.response?.data?.error || e.message || "Failed to cancel queue");
+    }
+  }
+
   const logout = () => {
     clearAdminToken();
     navigate("/admin/login");
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-teal-100 selection:text-teal-900">
       <Header
         title="Administrative Dashboard"
         subtitle="Manage hospital queues and tokens in real-time"
@@ -214,9 +240,7 @@ export default function AdminDashboardPage() {
             onClick={logout}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#42a19c] transition-colors shadow-sm"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             Secure Logout
           </button>
         </div>
@@ -257,9 +281,7 @@ export default function AdminDashboardPage() {
         {/* Error Alert */}
         {error && (
           <div className="mb-8 rounded-xl bg-red-50 border border-red-200 p-4 flex items-start gap-3 shadow-sm">
-            <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-            </svg>
+            <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
             <div>
               <h3 className="text-sm font-medium text-red-800">{error}</h3>
               <p className="text-sm text-red-700 mt-1">Please try your request again.</p>
@@ -309,7 +331,7 @@ export default function AdminDashboardPage() {
             </form>
           </div>
 
-          {/* Add Queue Form */}
+          {/* Add Queue Form (UPDATED WITH SITTING TIME) */}
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
             <h3 className="text-lg font-bold text-slate-900 mb-5 flex items-center gap-2 border-b border-slate-100 pb-4">
               <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600">
@@ -345,6 +367,27 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Start Time</label>
+                  <input
+                    type="time"
+                    className="block w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:ring-[#42a19c] focus:border-[#42a19c] outline-none transition-colors"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">End Time</label>
+                  <input
+                    type="time"
+                    className="block w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm focus:ring-[#42a19c] focus:border-[#42a19c] outline-none transition-colors"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Avg Time per Patient (mins)</label>
                 <input
@@ -373,10 +416,7 @@ export default function AdminDashboardPage() {
 
           {loading ? (
             <div className="bg-white border border-slate-200 rounded-xl p-16 text-center shadow-sm">
-              <svg className="animate-spin h-10 w-10 text-[#42a19c] mx-auto mb-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <svg className="animate-spin h-10 w-10 text-[#42a19c] mx-auto mb-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
               <p className="text-slate-500 font-medium">Retrieving facility data...</p>
             </div>
           ) : hospitals.length === 0 ? (
@@ -431,25 +471,45 @@ export default function AdminDashboardPage() {
 
                           return (
                             <div key={queue._id} className="border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group flex flex-col">
-                              {/* Accent Line */}
                               <div className="absolute top-0 left-0 right-0 h-1 bg-[#42a19c] opacity-0 group-hover:opacity-100 transition-opacity"></div>
                               
                               <div className="p-5 flex-1 flex flex-col">
-                                <div className="flex justify-between items-start mb-5">
-                                  <div>
+                                
+                                {/* Header with Details and Cancel Button */}
+                                <div className="flex justify-between items-start mb-5 relative">
+                                  <div className="pr-8">
                                     <h4 className="font-bold text-slate-900 text-lg leading-tight mb-1">{queue.name}</h4>
+                                    
+                                    {/* Display Time if Available */}
+                                    {(queue.startTime || queue.endTime) && (
+                                      <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mb-1">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        {formatTime(queue.startTime) || "?"} - {formatTime(queue.endTime) || "?"}
+                                      </p>
+                                    )}
+
                                     <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
                                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                       ~{queue.avgTimePerUser} min avg.
                                     </p>
                                   </div>
-                                  <div className="text-right bg-teal-50 border border-teal-100 px-3 py-1.5 rounded-lg">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-teal-600 mb-0.5">Serving</div>
-                                    <div className="text-2xl font-black text-[#42a19c] leading-none">#{currentToken}</div>
-                                  </div>
+
+                                  {/* Cancel / Delete Queue Button */}
+                                  <button
+                                    onClick={() => handleCancelQueue(queue._id)}
+                                    title="Cancel / Delete Queue"
+                                    className="absolute top-0 right-0 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                  </button>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3 mb-5">
+                                <div className="text-right bg-teal-50 border border-teal-100 px-3 py-1.5 rounded-lg mb-4 w-fit ml-auto">
+                                  <div className="text-[10px] font-bold uppercase tracking-wider text-teal-600 mb-0.5">Serving</div>
+                                  <div className="text-2xl font-black text-[#42a19c] leading-none">#{currentToken}</div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 mb-5 mt-auto">
                                   <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-center">
                                     <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Waiting</div>
                                     <div className="text-lg font-bold text-slate-900">{waiting}</div>
@@ -460,16 +520,8 @@ export default function AdminDashboardPage() {
                                   </div>
                                 </div>
 
-                                {waitingTokens.length > 0 && (
-                                  <div className="mt-auto mb-5 text-xs text-slate-500 bg-slate-50 border border-slate-100 p-2.5 rounded-lg">
-                                    <span className="font-semibold text-slate-700 block mb-1">Queue Preview:</span>
-                                    {waitingTokens.slice(0, 5).join(", ")}
-                                    {waitingTokens.length > 5 ? ` ...+${waitingTokens.length - 5} more` : ""}
-                                  </div>
-                                )}
-
                                 {/* Action Buttons */}
-                                <div className="flex gap-3 mt-auto pt-4 border-t border-slate-100">
+                                <div className="flex gap-3 pt-4 border-t border-slate-100">
                                   <button
                                     onClick={() => handleNext(queue._id)}
                                     disabled={waiting === 0}

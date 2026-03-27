@@ -1,44 +1,5 @@
 import React, { useMemo } from "react";
 
-function StatusPill({ children, className }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-300 ${className}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function TokenBadge({ token, isYou = false, isCurrent = false }) {
-  return (
-    <div
-      key={token}
-      className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 font-semibold transition-all duration-300 transform ${
-        isCurrent
-          ? "bg-gradient-to-r from-medical-600 to-blue-600 text-white border-transparent shadow-lg scale-110"
-          : isYou
-          ? "bg-medical-100 border-medical-300 text-medical-900 shadow-sm"
-          : "bg-white border-gray-200 text-gray-900 hover:shadow-card"
-      }`}
-    >
-      <span className={`text-lg font-bold ${isCurrent ? "text-white" : ""}`}>
-        {token}
-      </span>
-
-      {isYou && !isCurrent && (
-        <span className="ml-1 inline-block px-2 py-0.5 rounded-full bg-medical-200 text-medical-800 text-[10px] font-bold animate-pulse-soft">
-          YOU
-        </span>
-      )}
-
-      {isCurrent && (
-        <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse-soft ml-1" />
-      )}
-    </div>
-  );
-}
-
 export default function QueueVisualization({
   hospitalId,
   queueId,
@@ -67,26 +28,29 @@ export default function QueueVisualization({
       yourTokenPosition: null,
     };
 
-    const maxAfter = Math.max(0, maxTotal - 1); // excluding current token
+    const maxAfter = Math.max(0, maxTotal - 1);
+
     if (!waiting.length) return { ...result, visibleWaiting: [] };
 
     if (you != null && waiting.includes(you)) {
       result.isYourWaitingToken = true;
-      result.yourTokenPosition = waiting.indexOf(you); // index within waiting array
+      result.yourTokenPosition = waiting.indexOf(you);
 
       const idx = result.yourTokenPosition;
       const start = Math.max(0, idx - 2);
       const end = Math.min(waiting.length, start + maxAfter);
+
       result.prefixGap = start > 0;
       result.suffixGap = end < waiting.length;
       result.visibleWaiting = waiting.slice(start, end);
+
       return result;
     }
 
-    // Default: show from the start (closest to current token).
     const end = Math.min(waiting.length, maxAfter);
     result.visibleWaiting = waiting.slice(0, end);
     result.suffixGap = end < waiting.length;
+
     return result;
   }, [waiting, you, maxTotal]);
 
@@ -94,93 +58,116 @@ export default function QueueVisualization({
     you != null && (Number.isNaN(you) || you <= cur || !waiting.includes(you));
 
   return (
-    <div className="card animate-fade-in-up">
-      <div className="flex items-start justify-between gap-3 pb-4 border-b border-gray-200">
-        <div className="flex-1">
-          <div className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            <span>📊</span>
-            Queue Visualization
-          </div>
-          <div className="text-xs text-gray-600 mt-1">
-            Real-time queue position from "Now serving" onward.
-          </div>
+    <div className="bg-white/80 backdrop-blur-md border border-gray-200 rounded-2xl shadow-xl p-6 transition-all duration-300 hover:shadow-2xl">
+      
+      {/* HEADER */}
+      <div className="flex justify-between items-start border-b pb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            📊 Queue Visualization
+          </h2>
+          <p className="text-sm text-gray-500">
+            Live tracking from current token onwards
+          </p>
         </div>
-        <div className="text-right text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-          <div className="font-semibold text-gray-700">Queue Info</div>
-          <div className="mt-1">
-            <div>Hospital: <span className="font-mono font-semibold">{hospitalId}</span></div>
-            <div>Queue: <span className="font-mono font-semibold">{queueId}</span></div>
-          </div>
+
+        <div className="text-xs bg-gray-100 px-3 py-2 rounded-lg text-gray-600">
+          <div><b>ID:</b> {queueId}</div>
+          <div><b>Hospital:</b> {hospitalId}</div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <StatusPill className="bg-gradient-to-r from-medical-600 to-blue-600 text-white border-transparent shadow-md">
-          <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse-soft mr-1.5" />
+      {/* STATUS PILLS */}
+      <div className="flex flex-wrap gap-2 mt-4">
+        <span className="px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-semibold shadow">
           Now Serving: {cur}
-        </StatusPill>
+        </span>
 
         {you != null ? (
           isYourWaitingToken ? (
-            <StatusPill className="bg-medical-100 border-medical-300 text-medical-900">
-              <span>🎯</span> Your Position: {you}
-            </StatusPill>
+            <span className="px-4 py-1.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
+              🎯 Your Token: {you}
+            </span>
           ) : yourBackendStatus === "skipped" ? (
-            <StatusPill className="bg-pending-100 border-pending-300 text-pending-900">
-              <span>⏭️</span> Skipped: {you}
-            </StatusPill>
+            <span className="px-4 py-1.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">
+              ⏭️ Skipped: {you}
+            </span>
           ) : yourBackendStatus === "completed" ? (
-            <StatusPill className="bg-success-100 border-success-300 text-success-900">
-              <span>✓</span> Completed: {you}
-            </StatusPill>
+            <span className="px-4 py-1.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">
+              ✓ Completed: {you}
+            </span>
           ) : (
-            <StatusPill className="bg-gray-100 border-gray-300 text-gray-900">
-              <span>→</span> Passed: {you}
-            </StatusPill>
+            <span className="px-4 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
+              Passed: {you}
+            </span>
           )
         ) : (
-          <StatusPill className="bg-gray-100 border-gray-300 text-gray-900">
-            <span>🔍</span> Join to track position
-          </StatusPill>
+          <span className="px-4 py-1.5 rounded-full bg-gray-100 text-gray-600 text-xs font-semibold">
+            Join queue to track
+          </span>
         )}
       </div>
 
+      {/* FLOW */}
       <div className="mt-6">
-        <div className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">Queue Flow</div>
-        
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-2 px-2">
-          <TokenBadge token={cur} isCurrent={true} />
-          <div className="text-gray-400 text-xl flex-shrink-0">→</div>
+        <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">
+          Queue Flow
+        </p>
 
-          {you != null && prefixGap ? (
-            <div className="text-xs text-gray-500 font-semibold flex-shrink-0 px-2 py-1">
-              ⋯ {yourTokenPosition} ahead ⋯
-            </div>
-          ) : null}
+        <div className="flex items-center gap-3 overflow-x-auto pb-2">
 
-          {visibleWaiting.length > 0 ? (
-            visibleWaiting.map((t) => (
-              <TokenBadge key={t} token={t} isYou={you != null && t === you} />
-            ))
-          ) : (
-            <div className="text-xs text-gray-500 italic">No one waiting</div>
+          {/* CURRENT TOKEN */}
+          <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105">
+            <span className="font-bold text-lg">{cur}</span>
+            <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+          </div>
+
+          <span className="text-gray-400 text-xl">→</span>
+
+          {/* PREFIX GAP */}
+          {you != null && prefixGap && (
+            <span className="text-xs text-gray-400 whitespace-nowrap">
+              +{yourTokenPosition} ahead
+            </span>
           )}
 
-          {suffixGap ? (
-            <div className="text-xs text-gray-500 font-semibold flex-shrink-0 px-2 py-1">
-              ⋯
-            </div>
-          ) : null}
+          {/* WAITING TOKENS */}
+          {visibleWaiting.length > 0 ? (
+            visibleWaiting.map((t) => (
+              <div
+                key={t}
+                className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-all ${
+                  t === you
+                    ? "bg-blue-100 border-blue-300 text-blue-800 scale-105"
+                    : "bg-white border-gray-200 text-gray-800 hover:shadow-md"
+                }`}
+              >
+                {t}
+                {t === you && (
+                  <span className="ml-2 text-[10px] px-2 py-0.5 bg-blue-200 rounded-full">
+                    YOU
+                  </span>
+                )}
+              </div>
+            ))
+          ) : (
+            <span className="text-gray-400 text-sm">No waiting</span>
+          )}
+
+          {/* SUFFIX GAP */}
+          {suffixGap && (
+            <span className="text-xs text-gray-400">...</span>
+          )}
         </div>
 
-        {you != null && !waiting.includes(you) && yourIsCalledOrPassed ? (
-          <div className="mt-4 text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2">
-            <span className="text-lg flex-shrink-0">ℹ️</span>
-            <span>Your token has been called or completed. Visit the counter!</span>
+        {/* INFO BOX */}
+        {you != null && !waiting.includes(you) && yourIsCalledOrPassed && (
+          <div className="mt-5 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 flex gap-2">
+            <span>ℹ️</span>
+            <span>Your token has been called. Please proceed.</span>
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );
 }
-

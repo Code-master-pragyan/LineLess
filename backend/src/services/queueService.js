@@ -129,6 +129,20 @@ async function advanceToken(queueId, action /* 'next' | 'skip' */) {
   return { moved: true, liveState };
 }
 
+// Assuming you have your Queue model imported at the top, something like:
+// const Queue = require("../models/Queue");
+
+async function deleteQueue(queueId) {
+  // Delete the queue from the database
+  const deletedQueue = await Queue.findByIdAndDelete(queueId);
+  
+  if (!deletedQueue) {
+    throw new Error("Queue not found");
+  }
+  
+  return deletedQueue;
+}
+
 module.exports = {
   getQueueLiveState,
   getUserTokenStatus,
@@ -138,4 +152,5 @@ module.exports = {
   listQueuesByHospital,
   generateToken,
   advanceToken,
+  deleteQueue,
 };
