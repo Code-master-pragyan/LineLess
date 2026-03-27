@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Professional medical typography */
+  body {
+    @apply text-gray-900;
+  }
+
+  h1 {
+    @apply text-3xl sm:text-4xl font-bold tracking-tight;
+  }
+
+  h2 {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight;
+  }
+
+  /* Enhanced focus states for accessibility */
+  @supports (selector(:focus-visible)) {
+    button:focus-visible,
+    input:focus-visible,
+    a:focus-visible {
+      @apply outline-2 outline-offset-2 outline-blue-500;
+    }
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  /* Loading skeleton animation */
+  .skeleton {
+    @apply bg-gray-200 rounded-lg;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-color: rgb(229, 231, 235);
+    }
+    50% {
+      background-color: rgb(209, 213, 219);
+    }
+    100% {
+      background-color: rgb(229, 231, 235);
+    }
+  }
+
+  /* Card base styles */
+  .card {
+    @apply rounded-2xl border border-gray-200 bg-white shadow-card hover:shadow-card-hover transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply hover:-translate-y-1;
+  }
+
+  /* Status badge animations */
+  .status-badge {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold transition-all duration-300;
+  }
+
+  /* Input focus ring */
+  .input-focus {
+    @apply focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500;
+  }
+
+  /* Smooth transition utility */
+  .transition-smooth {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  /* Button base animations */
+  .btn-interactive {
+    @apply transition-all duration-200 ease-out;
+  }
+
+  .btn-interactive:active {
+    @apply scale-95;
+  }
+
+  /* Fade in animations - staggered */
+  .animate-fade-in-1 {
+    @apply animate-fade-in;
+    animation-delay: 0ms;
+  }
+
+  .animate-fade-in-2 {
+    @apply animate-fade-in;
+    animation-delay: 100ms;
+  }
+
+  .animate-fade-in-3 {
+    @apply animate-fade-in;
+    animation-delay: 200ms;
+  }
+
+  .animate-fade-in-4 {
+    @apply animate-fade-in;
+    animation-delay: 300ms;
+  }
+}
+
+@layer utilities {
+  /* Reduce motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-md;
+  }
+
+  /* Smooth gradient backgrounds */
+  .gradient-medical {
+    @apply bg-gradient-to-br from-blue-50 via-blue-50 to-white;
+  }
+
+  /* Text truncation utilities */
+  .truncate-lines-2 {
+    @apply line-clamp-2;
+  }
+
+  .truncate-lines-3 {
+    @apply line-clamp-3;
+  }
+}
+
+
