@@ -1,12 +1,12 @@
 const http = require("http");
 const dotenv = require("dotenv");
 const { Server } = require("socket.io");
+dotenv.config();
 
 const { connectDB } = require("./db");
 const { createApp } = require("./app");
 const { setupSocket } = require("./socket/setupSocket");
 
-dotenv.config();
 
 async function start() {
   await connectDB();
